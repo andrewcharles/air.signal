@@ -7,7 +7,7 @@ import os
 from google.cloud import storage
 logging.basicConfig(level=logging.DEBUG) 
 
-credentials = service_account.Credentials.from_service_account_file('../earth_engine/earth-engine-workflow-013a80bf4f5b.json')
+credentials = service_account.Credentials.from_service_account_file(os.getenv('EE_KEY'))
 
 storage_client = storage.Client(credentials=credentials)
 OUTPUT_BUCKET = 'airsignal2023'
@@ -18,6 +18,9 @@ blobs = storage_client.list_blobs(OUTPUT_BUCKET)
 for blob in blobs:
     logging.info("Blobs: {}".format(blob.name))
     destination_uri = "{}/{}".format(folder, blob.name) 
-    blob.download_to_filename(destination_uri)
+    if(not os.path.isfile(destination_uri)):
+        blob.download_to_filename(destination_uri)
+    else:
+        print("has")
 
 

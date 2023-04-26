@@ -1,9 +1,19 @@
 # Earth engine to storage bucket
-
 from google.oauth2 import service_account
-#credentials = service_account.Credentials.from_service_account_file('./earth-engine-workflow-013a80bf4f5b.json')
-credentials = service_account.Credentials.from_service_account_file('./my-secret-key.json')
-#service_account = 'harvester@earth-engine-workflow.iam.gserviceaccount.com'
+from google.cloud import storage
+import os
+
+PROJECT_ID = "earth-engine-workflow"
+BUCKET_NAME = "airsignal2023"
+REGION = "us-central1"
+USER_NAME = 'charlesan'
+OUTPUT_BUCKET = 'airsignal2023'
+# Define a first set of dates
+START_DATE = "2023-02-01"
+END_DATE =  "2023-03-01"
+
+credentials = service_account.Credentials.from_service_account_file(os.getenv('EE_KEY'))
+storage_client = storage.Client(credentials=credentials)
 scoped_credentials = credentials.with_scopes(['https://www.googleapis.com/auth/cloud-platform'])
 from google.auth.transport.requests import AuthorizedSession
 session = AuthorizedSession(scoped_credentials)
@@ -46,44 +56,27 @@ def scale(image):
   #image = image.addBands(im2.select(bands))
   return image
 
-
-def mosaicByDate(imcol):
-  imlist = imcol.toList(imcol.size())
+def mosaicByDate(imcol_to_mosaic):
+  default_projection_func = imcol_to_mosaic.first().select(imcol_to_mosaic.first().bandNames()).projection()
+  imlist = imcol_to_mosaic.toList(imcol_to_mosaic.size())
   unique_dates = imlist.map(lambda im: ee.Image(im).date().format("YYYY-MM-dd")).distinct()
 
   def match_dates(d):
     d = ee.Date(d)
     dateString = ee.Date(d).format('yyyy-MM-dd')
-    im = imcol.filterDate(d, d.advance(1, "day")).mosaic()
+    im = imcol_to_mosaic.filterDate(d, d.advance(1, "day")).mosaic().setDefaultProjection(default_projection_func)
     return im.set(
         "system:time_start", d.millis(), 
-        "system:id", d.format("YYYY-MM-dd"))#.rename(dateString)
+        "system:id", d.format("YYYY-MM-dd")).copyProperties(imcol_to_mosaic)#.rename(dateString)
 
   mosaic_imlist = unique_dates.map(match_dates)
-
   return ee.ImageCollection(mosaic_imlist)
 
 def rename_date(img):
-  #img = img.select('B2')
   date_string = ee.Image(img).date().format("_YYYY-MM-dd")
-  #img = img.rename('BE')
-  #img = img.rename(ee.String('BE').cat("date"))
-  #img = img.rename(ee.String('BE').cat(date_string))
   rstr = img.bandNames().map(lambda bandname: ee.String(bandname).cat(date_string))
   img = img.rename(rstr)
   return img
-
-from google.oauth2 import service_account
-from google.cloud import storage
-
-PROJECT_ID = "earth-engine-workflow"
-BUCKET_NAME = "airsignal2023"
-REGION = "us-central1"
-USER_NAME = 'charlesan'
-
-credentials = service_account.Credentials.from_service_account_file('./earth-engine-workflow-013a80bf4f5b.json')
-storage_client = storage.Client(credentials=credentials)
-OUTPUT_BUCKET = 'airsignal2023'
 
 def create_bucket(bucket_name):
     bucket = storage_client.create_bucket(bucket_name)
@@ -105,15 +98,12 @@ else:
   print('Bucket does not exist')
   create_bucket(OUTPUT_BUCKET)
 
-
 blobs = storage_client.list_blobs(OUTPUT_BUCKET)
 # Note: The call returns a response only when the iterator is consumed.
 for blob in blobs:
   print(blob.name)
 
-# Define a first set of dates
-START_DATE = "2023-02-01"
-END_DATE =  "2023-03-01"
+
 
 imcol = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(ROI_POLY).filterDate(
     START_DATE, END_DATE).filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE",CLOUD_LIMIT)).select(BANDS).map(se2mask)

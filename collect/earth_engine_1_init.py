@@ -1,9 +1,8 @@
-# Script to test that everything is set up
+# Script to initialise and check environment is configured.
+import os
 
 from google.oauth2 import service_account
-#credentials = service_account.Credentials.from_service_account_file('./earth-engine-workflow-013a80bf4f5b.json')
-local_credentials = service_account.Credentials.from_service_account_file('./my-secret-key.json')
-#service_account = 'harvester@earth-engine-workflow.iam.gserviceaccount.com'
+credentials = service_account.Credentials.from_service_account_file(os.getenv('EE_KEY'))
 scoped_credentials = credentials.with_scopes(['https://www.googleapis.com/auth/cloud-platform'])
 from google.auth.transport.requests import AuthorizedSession
 session = AuthorizedSession(scoped_credentials)
@@ -17,19 +16,15 @@ xmax = 144.25
 ymin = -38.3
 ymax = -38.44
 
-
-
 from google.oauth2 import service_account
 from google.cloud import storage
 
 PROJECT_ID = "earth-engine-workflow"
-BUCKET_NAME = "airsignal2023"
+OUTPUT_BUCKET = 'airsignal2023'
 REGION = "us-central1"
 USER_NAME = 'charlesan'
 
-credentials = service_account.Credentials.from_service_account_file('./earth-engine-workflow-013a80bf4f5b.json')
 storage_client = storage.Client(credentials=credentials)
-OUTPUT_BUCKET = 'airsignal2023'
 
 def create_bucket(bucket_name):
     bucket = storage_client.create_bucket(bucket_name)
