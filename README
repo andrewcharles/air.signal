@@ -1,20 +1,23 @@
-Land surface analysis using free remote sensing and observational data.
+Exemplar algorithms for land surface analysis.
 
-Pure algorithms shorn of context.
-This repo will only use free data as a demonstration.
+This repo uses free remote sensing and observational data.
 
 Download free LiDAR from https://elevation.fsdf.org.au/
 
+Victorian Government data:
 https://datashare.maps.vic.gov.au/
 
-Earth Engine Guides
-===================
+References
+----------
+
+Calculating indices using Earth Engine
 https://www.geo.fu-berlin.de/en/v/geo-it/gee/2-monitoring-ndvi-nbr/2-2-calculating-indices/ndvi-s2/index.html
 
-
-Water classification
+Water classification methods:
 https://www.sciencedirect.com/science/article/pii/S0303243419311973
 
-Lidar aquisition
+Lidar data aquisition
+
 https://gossaas.azurewebsites.net/sitelocator/sitelocator.ashx?APEmail=contact@spatialsolutions.com.au&title=Spatial%20Solutions&center=-34.927228,138.595858,10
+
 https://dronesforhire.com.au/
