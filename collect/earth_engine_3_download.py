@@ -8,7 +8,6 @@ from google.cloud import storage
 logging.basicConfig(level=logging.DEBUG) 
 
 credentials = service_account.Credentials.from_service_account_file(os.getenv('EE_KEY'))
-
 storage_client = storage.Client(credentials=credentials)
 OUTPUT_BUCKET = 'airsignal2023'
 folder = "../data/sig.mon"
