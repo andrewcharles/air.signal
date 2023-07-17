@@ -1,4 +1,59 @@
-Exemplar algorithms for land surface analysis.
+Exemplar algorithms for land surface analysis + architecture.
+
+1. ingest
+2. prepare
+3. train
+4. infer
+
+Processing pipeline via Airflow
+The airflow directory contains a docker file.
+
+Airflow Setup:
+
+curl -LfO 'https://airflow.apache.org/docs/apache-airflow/2.3.0/docker-compose.yaml'
+mkdir ./dags ./logs ./plugins
+
+Add this to the airflow-worker definition
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+echo -e "AIRFLOW_UID=$(id -u)\nAIRFLOW_GID=0" > .env
+docker-compose up airflow-init
+# run airflow db init and create the admin user for the Airflow Database. 
+# By default, the account created has the login airflow and the password airflow.
+docker-compose up
+
+set the AIRFLOW__CORE__LOAD_EXAMPLES to 'false' in docker-compose.yaml
+
+view in browser localhost:8080
+
+# enter container for maintenance
+docker exec -it <container-id> bash
+
+If you need to match this container application with a DNS in a server to use a Dockerized instance of Airflow in production, use a tool like Nginx Proxy Manager, map your server's IP to the domain name and use 8080 as the HTTP port
+
+# cleanup
+docker-compose down --volumes --rmi all
+
+# References
+https://github.com/MBKraus/incremental_training/blob/master/airflow_docker/Dockerfile
+
+
+
+Experiment logging via MLFlow
+
+Structure
+1. collect: python package for collecting remote sensing data from Earth Engine
+
+
+data: data stored here
+
+Running docker images:
+https://towardsdatascience.com/the-easiest-way-to-run-python-in-google-cloud-illustrated-d307c9e1651c
+
+
 
 This repo uses free remote sensing and observational data.
 
