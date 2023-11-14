@@ -1,10 +1,9 @@
 # SENTINEL FUNCTIONS
-# Use QA for mask then discard
-#https://github.com/davemlz/ee-catalog-scale-offset-params/blob/main/list/ee-catalog-scale-offset-parameters.json
+# DEFAULTS
 BANDS = ['B2','B3','B4','B8','QA60']
 CLOUD_LIMIT = 50
 # 8A is for masking the edges
-ALL_BANDS = ['B4','B8','B8A','B9','QA60']
+ALL_BANDS = ['B2','B3','B4','B8','B8A','B9','QA60']
 BANDS = ALL_BANDS
 CLOUD_LIMIT = 75
 CLOUD_FILTER = CLOUD_LIMIT
@@ -19,25 +18,27 @@ import ee
 from urllib.request import urlopen
 import json
 import os
+
 url = "https://raw.githubusercontent.com/davemlz/ee-catalog-scale-offset-params/main/list/ee-catalog-scale-offset-parameters.json"
 scaling_factor_filename = 'ee-catalog-scale-offset-parameters.json'
-
 if os.path.isfile(scaling_factor_filename):
   print("reading scale from file")
   with open(scaling_factor_filename, 'r') as f:
     scaling_factors = json.loads(f.read())
 else:
-  print("download scale")
+  print("download scaling factors")
   response = urlopen(url)
   scaling_factors = json.loads(response.read())
   with open(scaling_factor_filename, 'w') as f:
       json.dump(scaling_factors, f)
 
 def se2mask(image):
+  # Use QA for mask then discard
   quality_band = image.select('QA60')
-  cloudmask = 1 << 10
-  cirrusmask = 1 << 11
-  mask = quality_band.bitwiseAnd(cloudmask).eq(0) and (quality_band.bitwiseAnd(cirrusmask).eq(0))
+  # Does this bitwise shift even work in python
+  cloudmask = ee.Number(2).pow(10).int()
+  cirrusmask = ee.Number(2).pow(11).int()
+  mask = quality_band.bitwiseAnd(cloudmask).eq(0).And((quality_band.bitwiseAnd(cirrusmask).eq(0)))
   return image.updateMask(mask)
 
 # make a list of scaled bands and replace all at once
@@ -66,6 +67,17 @@ def maskEdges(s2_img):
 def se2SCLmask(image):
   # mask sentinel 2 using the SCL band
   # these categories mean:
+# 1	#ff0004	Saturated or defective
+#2	#868686	Dark Area Pixels
+#3	#774b0a	Cloud Shadows
+#4	#10d22c	Vegetation
+#5	#ffff52	Bare Soils
+#6	#0000ff	Water
+#7	#818181	Clouds Low Probability / Unclassified
+#8	#c0c0c0	Clouds Medium Probability
+#9	#f1f1f1	Clouds High Probability
+#10	#bac5eb	Cirrus
+#11	#52fff9	Snow / Ice
   # keep these values
   qa1 = image.select('SCL').neq(4)
   qa2 = image.select('SCL').neq(5)
@@ -76,11 +88,32 @@ def se2SCLmask(image):
   mask = qa.eq(0)
   return(image.updateMask(mask))
 
+def se2_SCL_cloudmask(image):
+  # mask out cloud and shadow
+  qa = image.select('SCL')
+  shadow = image.select('SCL').eq(3)
+  cloud = image.select('SCL').eq(9)
+  cirrus = image.select('SCL').eq(10)
+  #mask = shadow.neq(1).And(cloud.neq1(1)).And(cirrus.neq(1))
+  mask = shadow.eq(0).And(cloud.eq(0)).And(cirrus.eq(0))
+  #mask = shadow.Or(cloud).Or(cirrus)
+  return(image.updateMask(mask))
+
+
 def addNDVI(image):
   ndvi = image.normalizedDifference(['B8', 'B4']).rename('NDVI')
   return image.addBands(ndvi)
 
+def addNDWI(image):
+  ndwi = image.normalizedDifference(['B3', 'B8']).rename('NDWI')
+  return image.addBands(ndwi)
+
+def addNDMI(image):
+  ndwi = image.normalizedDifference(['B8', 'B11']).rename('NDWI')
+  return image.addBands(ndwi)
+
 # Cloud masking function
+# Not used
 def maskClouds(img,MAX_CLOUD_PROBABILITY=MAX_CLOUD_PROBABILITY):
   clouds = ee.Image(img.get('cloud_mask')).select('probability')
   isNotCloud = clouds.lt(MAX_CLOUD_PROBABILITY)
@@ -157,13 +190,13 @@ according to area of interest and date parameters, then join them on the
 system:index property. The result is a copy of the SR collection where each 
 image has a new 's2cloudless' property whose value is the corresponding 
 s2cloudless image."""
-def get_s2_sr_cld_col(aoi, start_date, end_date):
+def get_s2_sr_cld_col(aoi, start_date, end_date,cloud_filter=CLOUD_FILTER):
     # Import and filter S2 SR.
     s2_sr_col = (ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED')
         .filterBounds(aoi)
         .filterDate(start_date, end_date)
-        .map(maskEdges)
-        .filter(ee.Filter.lte('CLOUDY_PIXEL_PERCENTAGE', CLOUD_FILTER)))
+        #.map(maskEdges)
+        .filter(ee.Filter.lte('CLOUDY_PIXEL_PERCENTAGE', cloud_filter)))
 
     # Import and filter s2cloudless.
     s2_cloudless_col = (ee.ImageCollection('COPERNICUS/S2_CLOUD_PROBABILITY')
@@ -212,6 +245,61 @@ def print_info(imcol):
   print(idslist)
   print(ee.List.getInfo(unique_dates))
   print(ee.List.getInfo(bandnames))
+
+
+def get_sentinel(aoi,start_date,end_date,cloud_limit=CLOUD_LIMIT,bands=BANDS,collection=COLLECTION):
+  imcol = (ee.ImageCollection(collection).filterBounds(aoi)
+           .filterDate(start_date, end_date)
+           .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE",cloud_limit))
+           .select(bands)
+           .map(se2mask)
+      .map(scale)
+  )
+  imcol = mosaicByDate(imcol)
+  imcol = imcol.map(rename_date)
+  return(imcol)
+
+def get_sentinel_basic(aoi,start_date,end_date,cloud_limit=CLOUD_LIMIT,collection=COLLECTION):
+  """ No mosaic """
+  imcol = (ee.ImageCollection(collection).filterBounds(aoi)
+           .filterDate(start_date, end_date)
+           .filter(ee.Filter.lt("CLOUDY_PIXEL_PERCENTAGE",cloud_limit))
+           .map(se2mask)
+      .map(scale)
+  )
+  #imcol = imcol.map(rename_date)
+  return(imcol)
+
+# Get the names of a list of images (e.g. use with map)
+def get_name(img):
+  return(ee.Image(img).getString('id'))
+
+# TODO bandname needs to be dynamic get it from the imcol
+def imcol_to_bucket(imcol,OUTPUT_BUCKET="bucket",ROI_POLY="roi"):
+  img = imcol.first()
+  projection = img.select('B2').projection().getInfo()
+  imcol = imcol.toBands()
+  print(ee.List.getInfo(imcol.bandNames()))
+
+  # Save 10m bands
+  task = ee.batch.Export.image.toCloudStorage(**{
+    'image': imcol,
+    'description': 'image_export_job',
+    'bucket': OUTPUT_BUCKET,
+    #'fileNamePrefix': '',
+    #'dimensions':,
+    'crs': projection['crs'],
+    'scale':10,
+    'crsTransform': projection['transform'],
+    'region': ROI_POLY,
+    'fileFormat': 'GeoTIFF',
+    'formatOptions': {
+      'cloudOptimized': True
+    },
+    'maxPixels': 1e8})
+  task.start()
+
+
 
 if __name__ == "__main__":
   print("Running")

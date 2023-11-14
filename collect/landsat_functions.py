@@ -41,28 +41,105 @@ def addnd(image,b1,b2,name):
   nd = image.normalizedDifference([b1, b2]).rename(name)
   return image.addBands(nd)
 
-def addNDVI_landsat457(image):
+# Better way to do this
+# 1. translate bands to R, G, B, NIR etc
+# have one set of formulae
+
+def addNDVI_landsat45TM(image):
+  return(addnd(image,'B4','B5','NDVI'))
+
+# Green and NIR
+def addNDWI_landsat45TM(image):
+  ndvi = image.normalizedDifference(['B3', 'B5']).rename('NDWI')
+  return image.addBands(ndvi)
+
+# SWIR and NIR
+def addNDMI_L45TM(image):
+  ndvi = image.normalizedDifference(['B4', 'B5']).rename('NDWI')
+  return image.addBands(ndvi)
+
+##################
+# LANDSAT 4 and 5
+# SURFACE REFLECTANCE
+
+# NDVI is NIR - RED / NIR + RED
+def addNDVI_L45TMSR(image):
+  ndvi = image.normalizedDifference(['SR_B4', 'SR_B3']).rename('NDVI')
+  return image.addBands(ndvi)
+
+# Green and NIR
+# green - NIR / green + nir
+def addNDWI_L45TMSR(image):
+  ndvi = image.normalizedDifference(['SR_B2', 'SR_B4']).rename('NDWI')
+  return image.addBands(ndvi)
+
+# SWIR and NIR
+def addNDMI_L45TMSR(image):
+  ndvi = image.normalizedDifference(['SR_B4', 'SR_B5']).rename('NDWI')
+  return image.addBands(ndvi)
+##################
+
+##################
+# LANDSAT 7 SR
+def addNDVI_landsat7SR(image):
+  ndvi = image.normalizedDifference(['SR_B4', 'SR_B3']).rename('NDVI')
+  return image.addBands(ndvi)
+
+def addNDWI_landsat7SR(image):
+  ndvi = image.normalizedDifference(['SR_B2', 'SR_B4']).rename('NDWI')
+  return image.addBands(ndvi)
+
+def addNDMI_landsat7SR(image):
+  ndvi = image.normalizedDifference(['SR_B4', 'SR_B5']).rename('NDWI')
+  return image.addBands(ndvi)
+##################
+
+##################
+# Landsat 7 TOA
+def addNDVI_landsat7(image):
   ndvi = image.normalizedDifference(['B4', 'B3']).rename('NDVI')
   return image.addBands(ndvi)
 
+def addNDWI_landsat7(image):
+  ndvi = image.normalizedDifference(['B2', 'B4']).rename('NDWI')
+  return image.addBands(ndvi)
+
+def addNDMI_landsat7(image):
+  ndvi = image.normalizedDifference(['B4', 'B5']).rename('NDWI')
+  return image.addBands(ndvi)
+##################
+
+
+##################
+# 8 and 9 TOA
 def addNDVI_landsat89(image):
   ndvi = image.normalizedDifference(['B5', 'B4']).rename('NDVI')
-  return image.addBands(ndvi)
-
-def addNDVI_L8SR(image):
-  ndvi = image.normalizedDifference(['SR_B5', 'SR_B4']).rename('NDVI')
-  return image.addBands(ndvi)
-
-def addNDWI_landsat457(image):
-  ndvi = image.normalizedDifference(['B4', 'B3']).rename('NDWI')
   return image.addBands(ndvi)
 
 def addNDWI_landsat89(image):
   ndvi = image.normalizedDifference(['B3', 'B5']).rename('NDWI')
   return image.addBands(ndvi)
 
+def addNDMI_landsat89(image):
+  ndvi = image.normalizedDifference(['B5', 'B6']).rename('NDWI')
+  return image.addBands(ndvi)
+##################
+
+##################
+# LANDSAT 8 SR
+def addNDVI_L8SR(image):
+  ndvi = image.normalizedDifference(['SR_B5', 'SR_B4']).rename('NDVI')
+  return image.addBands(ndvi)
+
 def addNDWI_L8SR(image):
   ndvi = image.normalizedDifference(['SR_B3', 'SR_B5']).rename('NDWI')
+  return image.addBands(ndvi)
+##################
+
+
+# Moisture index - water content of leaves
+def addNDMI_L8SR(image):
+  ndvi = image.normalizedDifference(['SR_B5', 'SR_B6']).rename('NDMI')
   return image.addBands(ndvi)
 
 #Landsat 4-5 TM NDWI = (B03 - B05) / (B03 + B05)
@@ -119,6 +196,15 @@ def maskL457sr(image):
         .updateMask(qaMask) \
         .updateMask(saturationMask)
 
+# Define the SR masking function
+def scaleL457sr(image):
+    opticalBands = image.select(['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7']) \
+        .multiply(0.0000275).add(-0.2)
+    thermalBand = image.select('ST_B6').multiply(0.00341802).add(149.0)
+
+    return image.addBands(opticalBands, None, True) \
+        .addBands(thermalBand, None, True) 
+
 # Manually composite TOA  corrections
 def maskL457toa(image):
     # Bit 0 - Fill
@@ -166,7 +252,7 @@ def maskL8sr(image):
 
 def scaleL8sr(image):
     # Apply the scaling factors to the appropriate bands.
-    opticalBands = image.select(['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5', 'SR_B7']) \
+    opticalBands = image.select(['SR_B1', 'SR_B2', 'SR_B3', 'SR_B4', 'SR_B5','SR_B6', 'SR_B7']) \
         .multiply(0.0000275).add(-0.2)
     thermalBand = image.select('ST_B10').multiply(0.00341802).add(149.0)
 

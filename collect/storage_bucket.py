@@ -11,3 +11,12 @@ def bucket_exists(bucket_name, storage_client):
     except Exception as e:
         print(e)
         return False
+    
+from google.oauth2 import service_account
+from google.cloud import storage
+from google.auth.transport.requests import AuthorizedSession
+
+def storage_auth(key):
+    credentials = service_account.Credentials.from_service_account_file(key)
+    storage_client = storage.Client(credentials=credentials)
+    return(storage_client)
